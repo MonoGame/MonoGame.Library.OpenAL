@@ -12,8 +12,8 @@ public sealed class BuildMacOSTask : FrostingTask<BuildContext>
     public override void Run(BuildContext context)
     {
         var buildWorkingDir = "openal-soft/build_osx";
-        System.IO.Directory.CreateDirectory(buildWorkingDir);
-        System.IO.Directory.CreateDirectory($"{context.ArtifactsDir}/osx/");
+        context.CreateDirectory(buildWorkingDir);
+        context.CreateDirectory($"{context.ArtifactsDir}/osx/");
         context.StartProcess("cmake", new ProcessSettings { WorkingDirectory = buildWorkingDir, Arguments = "-DCMAKE_OSX_ARCHITECTURES=\"x86_64;arm64\" -DALSOFT_REQUIRE_COREAUDIO=ON -DALSOFT_TESTS=OFF -DALSOFT_UTILS=OFF -DALSOFT_EXAMPLES=OFF -DALSOFT_INSTALL=OFF -DCMAKE_BUILD_TYPE=Release .." });
         context.StartProcess("cmake", new ProcessSettings { WorkingDirectory = buildWorkingDir, Arguments = "--build . --config Release" });
         var files = Directory.GetFiles(System.IO.Path.Combine(buildWorkingDir), "libopenal.*.*.*.dylib", SearchOption.TopDirectoryOnly);
@@ -28,8 +28,8 @@ public sealed class BuildMacOSTask : FrostingTask<BuildContext>
     void BuildiOS (BuildContext context)
     {
         var buildWorkingDir = "openal-soft/build_ios";
-        System.IO.Directory.CreateDirectory(buildWorkingDir);
-        System.IO.Directory.CreateDirectory($"{context.ArtifactsDir}/ios/");
+        context.CreateDirectory(buildWorkingDir);
+        context.CreateDirectory($"{context.ArtifactsDir}/ios/");
         context.StartProcess("cmake", new ProcessSettings { WorkingDirectory = buildWorkingDir, Arguments = "-GXcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_ARCHITECTURES=\"arm64\" -DALSOFT_REQUIRE_COREAUDIO=ON -DALSOFT_TESTS=OFF -DALSOFT_UTILS=OFF -DALSOFT_EXAMPLES=OFF -DALSOFT_INSTALL=OFF -DCMAKE_BUILD_TYPE=Release .." });
         context.StartProcess("cmake", new ProcessSettings { WorkingDirectory = buildWorkingDir, Arguments = "--build . --config Release" });
         var files = Directory.GetFiles(System.IO.Path.Combine(buildWorkingDir, "Release-iphoneos"), "libopenal.*.*.*.dylib", SearchOption.TopDirectoryOnly);

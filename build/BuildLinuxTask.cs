@@ -12,6 +12,8 @@ public sealed class BuildLinuxTask : FrostingTask<BuildContext>
     public override void Run(BuildContext context)
     {
         var buildWorkingDir = "openal-soft/build_linux";
+        context.CreateDirectory(buildWorkingDir);
+        context.CreateDirectory($"{context.ArtifactsDir}/linux-x64/");
         context.StartProcess("cmake", new ProcessSettings { WorkingDirectory = buildWorkingDir, Arguments = "-DALSOFT_TESTS=OFF -DALSOFT_UTILS=OFF -DALSOFT_EXAMPLES=OFF -DALSOFT_INSTALL=OFF .." });
         context.StartProcess("make", new ProcessSettings { WorkingDirectory = buildWorkingDir, Arguments = "" });
         context.CopyFile($"{buildWorkingDir}libopenal.so", $"{context.ArtifactsDir}/linux-x64/libopenal.so");
@@ -25,8 +27,8 @@ public sealed class BuildLinuxTask : FrostingTask<BuildContext>
     {
         var ndk = System.Environment.GetEnvironmentVariable ("ANDROID_NDK_HOME");
         var buildWorkingDir = $"openal-soft/build_android_{arch}";
-        System.IO.Directory.CreateDirectory(buildWorkingDir);
-        System.IO.Directory.CreateDirectory($"{context.ArtifactsDir}/{rid}");
+        context.CreateDirectory(buildWorkingDir);
+        context.CreateDirectory($"{context.ArtifactsDir}/{rid}");
         context.StartProcess("cmake", new ProcessSettings { WorkingDirectory = buildWorkingDir, Arguments = $"-DANDROID_ABI={arch} -DANDROID_PLATFORM={minNdk} -DCMAKE_TOOLCHAIN_FILE={ndk}/build/cmake/android.toolchain.cmake -DALSOFT_EMBED_HRTF_DATA=TRUE -DALSOFT_REQUIRE_OPENSL=ON -DCMAKE_BUILD_TYPE=Release -DANDROID_NDK={ndk} .." });
         context.StartProcess("cmake", new ProcessSettings { WorkingDirectory = buildWorkingDir, Arguments = "--build . --config Release" });
         context.CopyFile($"{buildWorkingDir}/libopenal.so", $"{context.ArtifactsDir}/{rid}/libopenal.so");
