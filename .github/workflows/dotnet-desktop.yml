@@ -45,8 +45,10 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
+      - name: Rename License File
+        run: mv ./openal-soft/LICENSE-pffft ./openal-soft/LICENSE 
       - name: Run CAKE
-        run: dotnet run --project ./build/Build.csproj -- --target=Package --universalBinary=true --libraryname=Assimp --licensepath=assimp/LICENSE -v:diagnostic
+        run: dotnet run --project ./build/Build.csproj -- --target=Package --universalBinary=true --libraryname=OpenAL --licensepath=openal-soft/LICENSE/LICENSE -v:diagnostic
         env:
           ACTIONS_RUNTIME_TOKEN: ${{ env.ACTIONS_RUNTIME_TOKEN }}
           ACTIONS_RUNTIME_URL: "${{ env.ACTIONS_RUNTIME_URL }}"
