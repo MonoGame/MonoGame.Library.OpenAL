@@ -18,6 +18,6 @@ public sealed class BuildWindowsTask : FrostingTask<BuildContext>
         //context.ReplaceTextInFiles("assimp/code/assimp.vcxproj", "MultiThreadedDLL", "MultiThreaded");
         //context.ReplaceTextInFiles("assimp/contrib/zlib/zlibstatic.vcxproj", "MultiThreadedDLL", "MultiThreaded");
         context.StartProcess("cmake", new ProcessSettings { WorkingDirectory = buildWorkingDir, Arguments = "--build . --config release" });
-        context.CopyFile(@"openal-soft/Release/OpenAL32.dll", $"{context.ArtifactsDir}/windows-x64/openal.dll");
+        context.CopyFile(@"openal-soft/build_windows/Release/OpenAL32.dll", $"{context.ArtifactsDir}/windows-x64/openal.dll");
     }
 }
