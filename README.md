@@ -1,3 +1,3 @@
-# MonoGame.Library.Assimp
+# MonoGame.Library.OpenAL
 
-This repository contains build scripts for building and deploying Assimp for use with MonoGame.
+This repository contains build scripts for building and deploying OpenAL for use with MonoGame.

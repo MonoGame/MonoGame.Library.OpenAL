@@ -56,7 +56,7 @@ jobs:
       - name: Make a release
         uses: ncipollo/release-action@v1
         with:
-          name: 'MonoGame.Library.Assimp ${{ github.ref_name }}'
+          name: 'MonoGame.Library.OpenAL ${{ github.ref_name }}'
           tag: ${{ github.ref_name }}
           allowUpdates: true
           removeArtifacts: true
