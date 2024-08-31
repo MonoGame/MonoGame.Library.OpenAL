@@ -1,3 +1,1 @@
-# MonoGame.Library.OpenAL
-
-This repository contains build scripts for building and deploying OpenAL for use with MonoGame.
+This package contains native libraries for OpenAL built for usage with MonoGame.
