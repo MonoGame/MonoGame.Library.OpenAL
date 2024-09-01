@@ -1,4 +1,6 @@
 using System.Runtime.InteropServices;
+using System.Collections.Generic;
+using System;
 
 namespace BuildScripts;
 
@@ -18,22 +20,27 @@ public sealed class BuildMacOSTask : FrostingTask<BuildContext>
         context.StartProcess("cmake", new ProcessSettings { WorkingDirectory = buildWorkingDir, Arguments = "--build . --config Release" });
         var files = Directory.GetFiles(System.IO.Path.Combine(buildWorkingDir), "libopenal.*.*.*.dylib", SearchOption.TopDirectoryOnly);
         context.CopyFile(files[0], $"{context.ArtifactsDir}/osx/libopenal.dylib");
-        // BuildAndroid (context, "arm64-v8a", "android-arm64", "23");
-        // BuildAndroid (context, "armeabi-v7a", "android-arm", "23");
-        // BuildAndroid (context, "x86", "android-x86", "23");
-        // BuildAndroid (context, "x86_64", "android-x64", "23");
-        BuildiOS (context);
+        BuildiOS(context, "arm64", "ios-arm64", releaseDir: "Release-iphoneos");
+        BuildiOS(context, "x86_64", "iossimulator-x64", true, "Release-iphonesimulator");
+        BuildiOS(context, "arm64", "iossimulator-arm64", true, "Release-iphonesimulator");
     }
 
-    void BuildiOS (BuildContext context)
+    void BuildiOS (BuildContext context, string arch, string rid, bool simulator = false, string releaseDir = "")
     {
-        var buildWorkingDir = "openal-soft/build_ios";
+        var buildWorkingDir = $"openal-soft/build_{rid}";
         context.CreateDirectory(buildWorkingDir);
-        context.CreateDirectory($"{context.ArtifactsDir}/ios/");
-        context.StartProcess("cmake", new ProcessSettings { WorkingDirectory = buildWorkingDir, Arguments = "-GXcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_ARCHITECTURES=\"arm64\" -DALSOFT_REQUIRE_COREAUDIO=ON -DALSOFT_TESTS=OFF -DALSOFT_UTILS=OFF -DALSOFT_EXAMPLES=OFF -DALSOFT_INSTALL=OFF -DCMAKE_BUILD_TYPE=Release .." });
-        context.StartProcess("cmake", new ProcessSettings { WorkingDirectory = buildWorkingDir, Arguments = "--build . --config Release" });
-        var files = Directory.GetFiles(System.IO.Path.Combine(buildWorkingDir, "Release-iphoneos"), "libopenal.*.*.*.dylib", SearchOption.TopDirectoryOnly);
-        context.CopyFile(files[0], $"{context.ArtifactsDir}/ios/libopenal.dylib");
+        context.CreateDirectory($"{context.ArtifactsDir}/{rid}/");
+        var sdk = "";
+        if (simulator) {
+            // hard code this for now
+            //This does not work when used as an argument? $(xcodebuild -version -sdk iphonesimulator Path)";
+            sdk = $" -DCMAKE_OSX_SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator17.5.sdk";
+        }
+        context.StartProcess("cmake", new ProcessSettings { WorkingDirectory = buildWorkingDir, Arguments = $"-GXcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_ARCHITECTURES=\"{arch}\" -DALSOFT_REQUIRE_COREAUDIO=ON -DALSOFT_TESTS=OFF -DALSOFT_UTILS=OFF -DALSOFT_EXAMPLES=OFF -DALSOFT_INSTALL=OFF -DCMAKE_BUILD_TYPE=Release{sdk} .." });
+        context.StartProcess("cmake", new ProcessSettings { WorkingDirectory = buildWorkingDir, Arguments = $"--build . --config Release" });
+        var files = Directory.GetFiles(System.IO.Path.Combine(buildWorkingDir, releaseDir), "libopenal.*.*.*.dylib", SearchOption.TopDirectoryOnly);
+        //if (files.Length > 0)
+        context.CopyFile(files[0], $"{context.ArtifactsDir}/{rid}/libopenal.dylib");
     }
 
     void BuildAndroid (BuildContext context, string arch, string rid, string minNdk)
