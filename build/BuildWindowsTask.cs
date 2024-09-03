@@ -11,13 +11,18 @@ public sealed class BuildWindowsTask : FrostingTask<BuildContext>
 
     public override void Run(BuildContext context)
     {
-        var buildWorkingDir = "openal-soft/build_windows";
+        var buildWorkingDir = "openal-soft/build_windows_x64";
         context.CreateDirectory(buildWorkingDir);
         context.CreateDirectory($"{context.ArtifactsDir}/win-x64/");
-        context.StartProcess("cmake", new ProcessSettings { WorkingDirectory = buildWorkingDir, Arguments = "-DALSOFT_TESTS=OFF -DALSOFT_UTILS=OFF -DALSOFT_EXAMPLES=OFF -DALSOFT_INSTALL=OFF .." });
-        //context.ReplaceTextInFiles("assimp/code/assimp.vcxproj", "MultiThreadedDLL", "MultiThreaded");
-        //context.ReplaceTextInFiles("assimp/contrib/zlib/zlibstatic.vcxproj", "MultiThreadedDLL", "MultiThreaded");
+        context.StartProcess("cmake", new ProcessSettings { WorkingDirectory = buildWorkingDir, Arguments = "-DALSOFT_TESTS=OFF -DALSOFT_UTILS=OFF -DALSOFT_EXAMPLES=OFF -DALSOFT_INSTALL=OFF -A x64 .." });
         context.StartProcess("cmake", new ProcessSettings { WorkingDirectory = buildWorkingDir, Arguments = "--build . --config release" });
-        context.CopyFile(@"openal-soft/build_windows/Release/OpenAL32.dll", $"{context.ArtifactsDir}/win-x64/openal.dll");
+        context.CopyFile(@"openal-soft/build_windows_x64/Release/OpenAL32.dll", $"{context.ArtifactsDir}/win-x64/openal.dll");
+
+        buildWorkingDir = "openal-soft/build_windows_arm64";
+        context.CreateDirectory(buildWorkingDir);
+        context.CreateDirectory($"{context.ArtifactsDir}/win-arm64/");
+        context.StartProcess("cmake", new ProcessSettings { WorkingDirectory = buildWorkingDir, Arguments = "-DALSOFT_TESTS=OFF -DALSOFT_UTILS=OFF -DALSOFT_EXAMPLES=OFF -DALSOFT_INSTALL=OFF -A ARM64 .." });
+        context.StartProcess("cmake", new ProcessSettings { WorkingDirectory = buildWorkingDir, Arguments = "--build . --config release" });
+        context.CopyFile(@"openal-soft/build_windows_arm64/Release/OpenAL32.dll", $"{context.ArtifactsDir}/win-arm64/openal.dll");
     }
 }
