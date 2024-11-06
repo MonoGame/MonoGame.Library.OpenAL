@@ -17,7 +17,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-20.04]
+        os: [windows-latest, macos-latest, ubuntu-latest]
       fail-fast: false
     steps:
       - name: Expose GitHub Runtime
@@ -31,7 +31,7 @@ jobs:
         shell: bash
       - name: Install Linux OpenAL dependencies
         if: runner.os == 'Linux'
-        run: sudo apt-get install libasound2-dev libpulse-dev libjack-dev libsdl2-dev oss4-dev portaudio19-dev qtbase5-dev libdbus-1-dev
+        run: sudo apt-get install libasound2-dev libpulse-dev libjack-dev libsdl2-dev oss4-dev portaudio19-dev qtbase5-dev libdbus-1-dev libpipewire-0.3-dev
         shell: bash
       - name: Clone repository
         uses: actions/checkout@v4
