@@ -21,6 +21,10 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get install build-essential git make cmake autoconf automake pkg-config
         shell: bash
+      - name: Install Linux OpenAL dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get install libasound2-dev libpulse-dev
+        shell: bash
       - name: Clone repository
         uses: actions/checkout@v4
         with:
