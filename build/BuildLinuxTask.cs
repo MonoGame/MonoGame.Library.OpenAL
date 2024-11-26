@@ -16,8 +16,8 @@ public sealed class BuildLinuxTask : FrostingTask<BuildContext>
         context.CreateDirectory($"{context.ArtifactsDir}/linux-x64/");
         context.StartProcess("cmake", new ProcessSettings { WorkingDirectory = buildWorkingDir, Arguments = "-DALSOFT_TESTS=OFF -DALSOFT_UTILS=OFF -DALSOFT_EXAMPLES=OFF -DALSOFT_INSTALL=OFF -DALSOFT_BACKEND_SNDIO=OFF -DCMAKE_BUILD_TYPE=Release .." });
         context.StartProcess("make", new ProcessSettings { WorkingDirectory = buildWorkingDir, Arguments = "" });
-        context.CopyFile($"{buildWorkingDir}/libopenal.so", $"{context.ArtifactsDir}/linux-x64/libopenal.so");
         context.StartProcess ("strip", new ProcessSettings { WorkingDirectory = buildWorkingDir, Arguments = $"--strip-all libopenal.so"});
+        context.CopyFile($"{buildWorkingDir}/libopenal.so", $"{context.ArtifactsDir}/linux-x64/libopenal.so");
         BuildAndroid (context, "arm64-v8a", "android-arm64", "23");
         BuildAndroid (context, "armeabi-v7a", "android-arm", "23");
         BuildAndroid (context, "x86", "android-x86", "23");
