@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Collections.Generic;
 using System;
+using Spectre.Console;
 
 namespace BuildScripts;
 
@@ -20,7 +21,8 @@ public sealed class BuildMacOSTask : FrostingTask<BuildContext>
         context.StartProcess("cmake", new ProcessSettings { WorkingDirectory = buildWorkingDir, Arguments = "--build . --config Release" });
         var files = Directory.GetFiles(System.IO.Path.Combine(buildWorkingDir), "libopenal.*.*.*.dylib", SearchOption.TopDirectoryOnly);
         context.CopyFile(files[0], $"{context.ArtifactsDir}/osx/libopenal.dylib");
-        BuildiOS(context, "arm64", "ios-arm64", releaseDir: "Release-iphoneos");
+        // Don't build iphone binary as we cannot use dylibs. 
+        //BuildiOS(context, "arm64", "ios-arm64", releaseDir: "Release-iphoneos");
         BuildiOS(context, "x86_64", "iossimulator-x64", true, "Release-iphonesimulator");
         BuildiOS(context, "arm64", "iossimulator-arm64", true, "Release-iphonesimulator");
     }
@@ -32,9 +34,10 @@ public sealed class BuildMacOSTask : FrostingTask<BuildContext>
         context.CreateDirectory($"{context.ArtifactsDir}/{rid}/");
         var sdk = "";
         if (simulator) {
-            // hard code this for now
+            IEnumerable<string> output;
+            context.StartProcess("xcodebuild", new ProcessSettings { WorkingDirectory = buildWorkingDir, RedirectStandardOutput = true, Arguments="-version -sdk iphonesimulator Path"}, out output);
             //This does not work when used as an argument? $(xcodebuild -version -sdk iphonesimulator Path)";
-            sdk = $" -DCMAKE_OSX_SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator17.5.sdk";
+            sdk = $" -DCMAKE_OSX_SYSROOT={output.First()}";
         }
         context.StartProcess("cmake", new ProcessSettings { WorkingDirectory = buildWorkingDir, Arguments = $"-GXcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_ARCHITECTURES=\"{arch}\" -DALSOFT_REQUIRE_COREAUDIO=ON -DALSOFT_TESTS=OFF -DALSOFT_UTILS=OFF -DALSOFT_EXAMPLES=OFF -DALSOFT_INSTALL=OFF -DCMAKE_BUILD_TYPE=Release{sdk} .." });
         context.StartProcess("cmake", new ProcessSettings { WorkingDirectory = buildWorkingDir, Arguments = $"--build . --config Release" });
