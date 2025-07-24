@@ -117,7 +117,7 @@ public sealed class BuildMacOSTask : FrostingTask<BuildContext>
     {
         var x64SimulatorFramework = $"{context.ArtifactsDir}/iossimulator-x64/{frameworkName}.framework";
         var arm64SimulatorFramework = $"{context.ArtifactsDir}/iossimulator-arm64/{frameworkName}.framework";
-        var combinedSimulatorFramework = $"{context.ArtifactsDir}/iossimulator-combined/{frameworkName}.framework";
+        var combinedSimulatorFramework = $"{context.ArtifactsDir}/ios-arm64_x86_64-simulator/{frameworkName}.framework";
         
         // Check if both simulator frameworks exist
         if (!Directory.Exists(x64SimulatorFramework) || !File.Exists($"{x64SimulatorFramework}/{frameworkName}"))
@@ -133,7 +133,7 @@ public sealed class BuildMacOSTask : FrostingTask<BuildContext>
         }
         
         // Create combined simulator framework directory
-        context.CreateDirectory($"{context.ArtifactsDir}/iossimulator-combined/");
+        context.CreateDirectory($"{context.ArtifactsDir}/ios-arm64_x86_64-simulator/");
         
         if (Directory.Exists(combinedSimulatorFramework))
         {
