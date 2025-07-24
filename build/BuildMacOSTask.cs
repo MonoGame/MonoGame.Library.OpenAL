@@ -26,6 +26,9 @@ public sealed class BuildMacOSTask : FrostingTask<BuildContext>
         BuildiOS(context, "arm64", "ios-arm64", false, "Release-iphoneos");
         BuildiOS(context, "x86_64", "iossimulator-x64", true, "Release-iphonesimulator");
         BuildiOS(context, "arm64", "iossimulator-arm64", true, "Release-iphonesimulator");
+        
+        // Create universal iOS framework combining all architectures
+        CreateUniversaliOSFramework(context);
     }
 
     void BuildiOS (BuildContext context, string arch, string rid, bool simulator = false, string releaseDir = "")
@@ -100,6 +103,90 @@ public sealed class BuildMacOSTask : FrostingTask<BuildContext>
     <key>CFBundleSupportedPlatforms</key>
     <array>
 {supportedPlatforms}
+    </array>
+    <key>MinimumOSVersion</key>
+    <string>9.0</string>
+</dict>
+</plist>";
+        
+        File.WriteAllText(System.IO.Path.Combine(frameworkDir, "Info.plist"), infoPlistContent);
+    }
+
+    void CreateUniversaliOSFramework(BuildContext context)
+    {
+        var frameworkName = "OpenAL";
+        var universalFrameworkDir = $"{context.ArtifactsDir}/ios/{frameworkName}.framework";
+        context.CreateDirectory(universalFrameworkDir);
+        context.CreateDirectory($"{universalFrameworkDir}/Headers");
+        
+        // Collect all static libraries from individual architecture builds
+        var staticLibPaths = new List<string>();
+        var architectures = new[] { "ios-arm64", "iossimulator-x64", "iossimulator-arm64" };
+        
+        foreach (var arch in architectures)
+        {
+            var archFrameworkDir = $"{context.ArtifactsDir}/{arch}/{frameworkName}.framework";
+            var staticLibPath = $"{archFrameworkDir}/{frameworkName}";
+            if (File.Exists(staticLibPath))
+            {
+                staticLibPaths.Add(staticLibPath);
+            }
+        }
+        
+        if (staticLibPaths.Count > 0)
+        {
+            // Use lipo to create universal binary
+            var universalBinaryPath = $"{universalFrameworkDir}/{frameworkName}";
+            var lipoArgs = $"-create {string.Join(" ", staticLibPaths)} -output {universalBinaryPath}";
+            context.StartProcess("lipo", new ProcessSettings { Arguments = lipoArgs });
+            
+            // Copy headers from any of the individual frameworks (they're all the same)
+            var sourceHeadersDir = $"{context.ArtifactsDir}/ios-arm64/{frameworkName}.framework/Headers";
+            if (Directory.Exists(sourceHeadersDir))
+            {
+                var headerFiles = Directory.GetFiles(sourceHeadersDir, "*.h", SearchOption.TopDirectoryOnly);
+                foreach (var headerFile in headerFiles)
+                {
+                    var fileName = System.IO.Path.GetFileName(headerFile);
+                    context.CopyFile(headerFile, $"{universalFrameworkDir}/Headers/{fileName}");
+                }
+            }
+            
+            // Create Info.plist supporting both device and simulator platforms
+            CreateUniversalFrameworkInfoPlist(context, universalFrameworkDir, frameworkName);
+            
+            AnsiConsole.MarkupLine($"[green]Created universal iOS framework at: {universalFrameworkDir}[/]");
+        }
+    }
+
+    void CreateUniversalFrameworkInfoPlist(BuildContext context, string frameworkDir, string frameworkName)
+    {
+        var infoPlistContent = $@"<?xml version=""1.0"" encoding=""UTF-8""?>
+<!DOCTYPE plist PUBLIC ""-//Apple//DTD PLIST 1.0//EN"" ""http://www.apple.com/DTDs/PropertyList-1.0.dtd"">
+<plist version=""1.0"">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>English</string>
+    <key>CFBundleExecutable</key>
+    <string>{frameworkName}</string>
+    <key>CFBundleIdentifier</key>
+    <string>net.monogame.{frameworkName.ToLower()}</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>{frameworkName}</string>
+    <key>CFBundlePackageType</key>
+    <string>FMWK</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>CFBundleSignature</key>
+    <string>????</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>CFBundleSupportedPlatforms</key>
+    <array>
+        <string>iPhoneOS</string>
+        <string>iPhoneSimulator</string>
     </array>
     <key>MinimumOSVersion</key>
     <string>9.0</string>
