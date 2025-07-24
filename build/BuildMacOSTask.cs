@@ -28,8 +28,8 @@ public sealed class BuildMacOSTask : FrostingTask<BuildContext>
         BuildiOS(context, "x86_64", "iossimulator-x64", true, "Release-iphonesimulator");
         BuildiOS(context, "arm64", "iossimulator-arm64", true, "Release-iphonesimulator");
         
-        // Create universal iOS framework combining all architectures
-        CreateUniversaliOSFramework(context);
+        // Create universal iOS XCFramework combining all architectures
+        CreateiOSXCFramework(context);
     }
 
     void BuildiOS (BuildContext context, string arch, string rid, bool simulator = false, string releaseDir = "")
@@ -113,169 +113,72 @@ public sealed class BuildMacOSTask : FrostingTask<BuildContext>
         File.WriteAllText(System.IO.Path.Combine(frameworkDir, "Info.plist"), infoPlistContent);
     }
 
-    void CreateUniversaliOSFramework(BuildContext context)
+    void CreateiOSXCFramework(BuildContext context)
     {
         var frameworkName = "OpenAL";
-        var universalFrameworkDir = $"{context.ArtifactsDir}/ios/{frameworkName}.framework";
-        context.CreateDirectory(universalFrameworkDir);
-        context.CreateDirectory($"{universalFrameworkDir}/Headers");
+        var xcframeworkPath = $"{context.ArtifactsDir}/ios/{frameworkName}.xcframework";
         
-        // Collect all static libraries from individual architecture builds with their info
-        var libraryInfo = new List<(string path, string rid, string[] archs)>();
+        // Remove any existing XCFramework
+        if (Directory.Exists(xcframeworkPath))
+        {
+            Directory.Delete(xcframeworkPath, true);
+        }
+        
+        // Collect all framework paths from individual architecture builds
+        var frameworkPaths = new List<string>();
         var architectures = new[] { "ios-arm64", "iossimulator-x64", "iossimulator-arm64" };
         
         foreach (var arch in architectures)
         {
             var archFrameworkDir = $"{context.ArtifactsDir}/{arch}/{frameworkName}.framework";
-            var staticLibPath = $"{archFrameworkDir}/{frameworkName}";
-            if (File.Exists(staticLibPath))
+            if (Directory.Exists(archFrameworkDir) && File.Exists($"{archFrameworkDir}/{frameworkName}"))
             {
-                // Get architecture info using lipo -info
-                IEnumerable<string> lipoOutput;
-                var lipoInfoResult = context.StartProcess("lipo", 
-                    new ProcessSettings { 
-                        Arguments = $"-info {staticLibPath}",
-                        RedirectStandardOutput = true
-                    }, out lipoOutput);
-                
-                if (lipoInfoResult == 0)
-                {
-                    var lipoInfo = string.Join(" ", lipoOutput);
-                    // Parse architecture from lipo output like "Non-fat file: path is architecture: arm64"
-                    var archParts = lipoInfo.Split(':');
-                    if (archParts.Length >= 2)
-                    {
-                        var detectedArch = archParts[archParts.Length - 1].Trim();
-                        libraryInfo.Add((staticLibPath, arch, new[] { detectedArch }));
-                        AnsiConsole.MarkupLine($"[yellow]Detected architecture {detectedArch} for {arch}[/]");
-                    }
-                }
-                else
-                {
-                    AnsiConsole.MarkupLine($"[red]Failed to get architecture info for {staticLibPath}[/]");
-                }
-            }
-        }
-        
-        // Resolve architecture conflicts - prioritize device builds over simulators for duplicate architectures
-        var finalLibraries = new List<string>();
-        var usedArchitectures = new HashSet<string>();
-        
-        // First pass: add device libraries (ios-*)
-        foreach (var (path, rid, archs) in libraryInfo.Where(x => x.rid.StartsWith("ios-")))
-        {
-            var hasConflict = archs.Any(arch => usedArchitectures.Contains(arch));
-            if (!hasConflict)
-            {
-                finalLibraries.Add(path);
-                foreach (var arch in archs)
-                {
-                    usedArchitectures.Add(arch);
-                }
-                AnsiConsole.MarkupLine($"[green]Including {rid} with architectures: {string.Join(", ", archs)}[/]");
+                frameworkPaths.Add(archFrameworkDir);
+                AnsiConsole.MarkupLine($"[green]Found framework for {arch} at {archFrameworkDir}[/]");
             }
             else
             {
-                AnsiConsole.MarkupLine($"[yellow]Skipping {rid} due to architecture conflict with: {string.Join(", ", archs.Where(usedArchitectures.Contains))}[/]");
+                AnsiConsole.MarkupLine($"[yellow]Framework not found for {arch} at {archFrameworkDir}[/]");
             }
         }
         
-        // Second pass: add simulator libraries (iossimulator-*) that don't conflict
-        foreach (var (path, rid, archs) in libraryInfo.Where(x => x.rid.StartsWith("iossimulator-")))
+        if (frameworkPaths.Count > 0)
         {
-            var hasConflict = archs.Any(arch => usedArchitectures.Contains(arch));
-            if (!hasConflict)
+            // Build xcodebuild command to create XCFramework
+            var xcframeworkArgs = new List<string> { "-create-xcframework" };
+            
+            foreach (var frameworkPath in frameworkPaths)
             {
-                finalLibraries.Add(path);
-                foreach (var arch in archs)
-                {
-                    usedArchitectures.Add(arch);
-                }
-                AnsiConsole.MarkupLine($"[green]Including {rid} with architectures: {string.Join(", ", archs)}[/]");
+                xcframeworkArgs.Add("-framework");
+                xcframeworkArgs.Add(frameworkPath);
+            }
+            
+            xcframeworkArgs.Add("-output");
+            xcframeworkArgs.Add(xcframeworkPath);
+            
+            var arguments = string.Join(" ", xcframeworkArgs.Select(arg => arg.Contains(" ") ? $"\"{arg}\"" : arg));
+            
+            AnsiConsole.MarkupLine($"[blue]Creating XCFramework with command: xcodebuild {arguments}[/]");
+            
+            var result = context.StartProcess("xcodebuild", new ProcessSettings { Arguments = arguments });
+            
+            if (result == 0)
+            {
+                AnsiConsole.MarkupLine($"[green]Successfully created XCFramework at: {xcframeworkPath}[/]");
+                AnsiConsole.MarkupLine($"[green]XCFramework contains {frameworkPaths.Count} platform-specific frameworks[/]");
             }
             else
             {
-                AnsiConsole.MarkupLine($"[yellow]Skipping {rid} due to architecture conflict with: {string.Join(", ", archs.Where(usedArchitectures.Contains))}[/]");
+                AnsiConsole.MarkupLine($"[red]Failed to create XCFramework. Exit code: {result}[/]");
             }
-        }
-        
-        if (finalLibraries.Count > 0)
-        {
-            var universalBinaryPath = $"{universalFrameworkDir}/{frameworkName}";
-            
-            if (finalLibraries.Count == 1)
-            {
-                // Only one library, just copy it
-                context.CopyFile(finalLibraries[0], universalBinaryPath);
-                AnsiConsole.MarkupLine($"[yellow]Created single-architecture iOS framework (only one compatible library found)[/]");
-            }
-            else
-            {
-                // Use lipo to create universal binary from non-conflicting libraries
-                var lipoArgs = $"-create {string.Join(" ", finalLibraries)} -output {universalBinaryPath}";
-                context.StartProcess("lipo", new ProcessSettings { Arguments = lipoArgs });
-                AnsiConsole.MarkupLine($"[green]Created universal iOS framework with {finalLibraries.Count} architectures[/]");
-            }
-            
-            // Copy headers from any of the individual frameworks (they're all the same)
-            var sourceHeadersDir = $"{context.ArtifactsDir}/ios-arm64/{frameworkName}.framework/Headers";
-            if (Directory.Exists(sourceHeadersDir))
-            {
-                var headerFiles = Directory.GetFiles(sourceHeadersDir, "*.h", SearchOption.TopDirectoryOnly);
-                foreach (var headerFile in headerFiles)
-                {
-                    var fileName = System.IO.Path.GetFileName(headerFile);
-                    context.CopyFile(headerFile, $"{universalFrameworkDir}/Headers/{fileName}");
-                }
-            }
-            
-            // Create Info.plist supporting both device and simulator platforms
-            CreateUniversalFrameworkInfoPlist(context, universalFrameworkDir, frameworkName);
-            
-            AnsiConsole.MarkupLine($"[green]Created universal iOS framework at: {universalFrameworkDir}[/]");
         }
         else
         {
-            AnsiConsole.MarkupLine($"[red]No compatible libraries found for universal framework creation[/]");
+            AnsiConsole.MarkupLine($"[red]No framework paths found for XCFramework creation[/]");
         }
     }
 
-    void CreateUniversalFrameworkInfoPlist(BuildContext context, string frameworkDir, string frameworkName)
-    {
-        var infoPlistContent = $@"<?xml version=""1.0"" encoding=""UTF-8""?>
-<!DOCTYPE plist PUBLIC ""-//Apple//DTD PLIST 1.0//EN"" ""http://www.apple.com/DTDs/PropertyList-1.0.dtd"">
-<plist version=""1.0"">
-<dict>
-    <key>CFBundleDevelopmentRegion</key>
-    <string>English</string>
-    <key>CFBundleExecutable</key>
-    <string>{frameworkName}</string>
-    <key>CFBundleIdentifier</key>
-    <string>net.monogame.{frameworkName.ToLower()}</string>
-    <key>CFBundleInfoDictionaryVersion</key>
-    <string>6.0</string>
-    <key>CFBundleName</key>
-    <string>{frameworkName}</string>
-    <key>CFBundlePackageType</key>
-    <string>FMWK</string>
-    <key>CFBundleShortVersionString</key>
-    <string>1.0</string>
-    <key>CFBundleSignature</key>
-    <string>????</string>
-    <key>CFBundleVersion</key>
-    <string>1</string>
-    <key>CFBundleSupportedPlatforms</key>
-    <array>
-        <string>iPhoneOS</string>
-        <string>iPhoneSimulator</string>
-    </array>
-    <key>MinimumOSVersion</key>
-    <string>9.0</string>
-</dict>
-</plist>";
-        
-        File.WriteAllText(System.IO.Path.Combine(frameworkDir, "Info.plist"), infoPlistContent);
-    }
+
 
     void BuildAndroid (BuildContext context, string arch, string rid, string minNdk)
     {
