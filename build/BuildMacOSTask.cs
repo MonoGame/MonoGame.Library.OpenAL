@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using System.Collections.Generic;
 using System;
 using System.IO;
+using System.Linq;
 using Spectre.Console;
 
 namespace BuildScripts;
@@ -119,8 +120,8 @@ public sealed class BuildMacOSTask : FrostingTask<BuildContext>
         context.CreateDirectory(universalFrameworkDir);
         context.CreateDirectory($"{universalFrameworkDir}/Headers");
         
-        // Collect all static libraries from individual architecture builds
-        var staticLibPaths = new List<string>();
+        // Collect all static libraries from individual architecture builds with their info
+        var libraryInfo = new List<(string path, string rid, string[] archs)>();
         var architectures = new[] { "ios-arm64", "iossimulator-x64", "iossimulator-arm64" };
         
         foreach (var arch in architectures)
@@ -129,16 +130,92 @@ public sealed class BuildMacOSTask : FrostingTask<BuildContext>
             var staticLibPath = $"{archFrameworkDir}/{frameworkName}";
             if (File.Exists(staticLibPath))
             {
-                staticLibPaths.Add(staticLibPath);
+                // Get architecture info using lipo -info
+                IEnumerable<string> lipoOutput;
+                var lipoInfoResult = context.StartProcess("lipo", 
+                    new ProcessSettings { 
+                        Arguments = $"-info {staticLibPath}",
+                        RedirectStandardOutput = true
+                    }, out lipoOutput);
+                
+                if (lipoInfoResult == 0)
+                {
+                    var lipoInfo = string.Join(" ", lipoOutput);
+                    // Parse architecture from lipo output like "Non-fat file: path is architecture: arm64"
+                    var archParts = lipoInfo.Split(':');
+                    if (archParts.Length >= 2)
+                    {
+                        var detectedArch = archParts[archParts.Length - 1].Trim();
+                        libraryInfo.Add((staticLibPath, arch, new[] { detectedArch }));
+                        AnsiConsole.MarkupLine($"[yellow]Detected architecture {detectedArch} for {arch}[/]");
+                    }
+                }
+                else
+                {
+                    AnsiConsole.MarkupLine($"[red]Failed to get architecture info for {staticLibPath}[/]");
+                }
             }
         }
         
-        if (staticLibPaths.Count > 0)
+        // Resolve architecture conflicts - prioritize device builds over simulators for duplicate architectures
+        var finalLibraries = new List<string>();
+        var usedArchitectures = new HashSet<string>();
+        
+        // First pass: add device libraries (ios-*)
+        foreach (var (path, rid, archs) in libraryInfo.Where(x => x.rid.StartsWith("ios-")))
         {
-            // Use lipo to create universal binary
+            var hasConflict = archs.Any(arch => usedArchitectures.Contains(arch));
+            if (!hasConflict)
+            {
+                finalLibraries.Add(path);
+                foreach (var arch in archs)
+                {
+                    usedArchitectures.Add(arch);
+                }
+                AnsiConsole.MarkupLine($"[green]Including {rid} with architectures: {string.Join(", ", archs)}[/]");
+            }
+            else
+            {
+                AnsiConsole.MarkupLine($"[yellow]Skipping {rid} due to architecture conflict with: {string.Join(", ", archs.Where(usedArchitectures.Contains))}[/]");
+            }
+        }
+        
+        // Second pass: add simulator libraries (iossimulator-*) that don't conflict
+        foreach (var (path, rid, archs) in libraryInfo.Where(x => x.rid.StartsWith("iossimulator-")))
+        {
+            var hasConflict = archs.Any(arch => usedArchitectures.Contains(arch));
+            if (!hasConflict)
+            {
+                finalLibraries.Add(path);
+                foreach (var arch in archs)
+                {
+                    usedArchitectures.Add(arch);
+                }
+                AnsiConsole.MarkupLine($"[green]Including {rid} with architectures: {string.Join(", ", archs)}[/]");
+            }
+            else
+            {
+                AnsiConsole.MarkupLine($"[yellow]Skipping {rid} due to architecture conflict with: {string.Join(", ", archs.Where(usedArchitectures.Contains))}[/]");
+            }
+        }
+        
+        if (finalLibraries.Count > 0)
+        {
             var universalBinaryPath = $"{universalFrameworkDir}/{frameworkName}";
-            var lipoArgs = $"-create {string.Join(" ", staticLibPaths)} -output {universalBinaryPath}";
-            context.StartProcess("lipo", new ProcessSettings { Arguments = lipoArgs });
+            
+            if (finalLibraries.Count == 1)
+            {
+                // Only one library, just copy it
+                context.CopyFile(finalLibraries[0], universalBinaryPath);
+                AnsiConsole.MarkupLine($"[yellow]Created single-architecture iOS framework (only one compatible library found)[/]");
+            }
+            else
+            {
+                // Use lipo to create universal binary from non-conflicting libraries
+                var lipoArgs = $"-create {string.Join(" ", finalLibraries)} -output {universalBinaryPath}";
+                context.StartProcess("lipo", new ProcessSettings { Arguments = lipoArgs });
+                AnsiConsole.MarkupLine($"[green]Created universal iOS framework with {finalLibraries.Count} architectures[/]");
+            }
             
             // Copy headers from any of the individual frameworks (they're all the same)
             var sourceHeadersDir = $"{context.ArtifactsDir}/ios-arm64/{frameworkName}.framework/Headers";
@@ -156,6 +233,10 @@ public sealed class BuildMacOSTask : FrostingTask<BuildContext>
             CreateUniversalFrameworkInfoPlist(context, universalFrameworkDir, frameworkName);
             
             AnsiConsole.MarkupLine($"[green]Created universal iOS framework at: {universalFrameworkDir}[/]");
+        }
+        else
+        {
+            AnsiConsole.MarkupLine($"[red]No compatible libraries found for universal framework creation[/]");
         }
     }
 
