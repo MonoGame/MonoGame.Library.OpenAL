@@ -113,6 +113,67 @@ public sealed class BuildMacOSTask : FrostingTask<BuildContext>
         File.WriteAllText(System.IO.Path.Combine(frameworkDir, "Info.plist"), infoPlistContent);
     }
 
+    string? CreateCombinedSimulatorFramework(BuildContext context, string frameworkName)
+    {
+        var x64SimulatorFramework = $"{context.ArtifactsDir}/iossimulator-x64/{frameworkName}.framework";
+        var arm64SimulatorFramework = $"{context.ArtifactsDir}/iossimulator-arm64/{frameworkName}.framework";
+        var combinedSimulatorFramework = $"{context.ArtifactsDir}/iossimulator-combined/{frameworkName}.framework";
+        
+        // Check if both simulator frameworks exist
+        if (!Directory.Exists(x64SimulatorFramework) || !File.Exists($"{x64SimulatorFramework}/{frameworkName}"))
+        {
+            AnsiConsole.MarkupLine($"[yellow]x86_64 simulator framework not found at {x64SimulatorFramework}[/]");
+            return null;
+        }
+        
+        if (!Directory.Exists(arm64SimulatorFramework) || !File.Exists($"{arm64SimulatorFramework}/{frameworkName}"))
+        {
+            AnsiConsole.MarkupLine($"[yellow]arm64 simulator framework not found at {arm64SimulatorFramework}[/]");
+            return null;
+        }
+        
+        // Create combined simulator framework directory
+        context.CreateDirectory($"{context.ArtifactsDir}/iossimulator-combined/");
+        
+        if (Directory.Exists(combinedSimulatorFramework))
+        {
+            Directory.Delete(combinedSimulatorFramework, true);
+        }
+        
+        context.CreateDirectory(combinedSimulatorFramework);
+        context.CreateDirectory($"{combinedSimulatorFramework}/Headers");
+        
+        // Use lipo to combine the x86_64 and arm64 simulator binaries
+        var x64Binary = $"{x64SimulatorFramework}/{frameworkName}";
+        var arm64Binary = $"{arm64SimulatorFramework}/{frameworkName}";
+        var combinedBinary = $"{combinedSimulatorFramework}/{frameworkName}";
+        
+        AnsiConsole.MarkupLine($"[blue]Combining simulator binaries using lipo...[/]");
+        var lipoArgs = $"-create \"{x64Binary}\" \"{arm64Binary}\" -output \"{combinedBinary}\"";
+        var result = context.StartProcess("lipo", new ProcessSettings { Arguments = lipoArgs });
+        
+        if (result != 0)
+        {
+            AnsiConsole.MarkupLine($"[red]Failed to combine simulator binaries with lipo. Exit code: {result}[/]");
+            return null;
+        }
+        
+        // Copy headers from one of the simulator frameworks (they should be identical)
+        var headerSourceDir = $"{x64SimulatorFramework}/Headers";
+        var headerFiles = Directory.GetFiles(headerSourceDir, "*.h", SearchOption.TopDirectoryOnly);
+        foreach (var headerFile in headerFiles)
+        {
+            var fileName = System.IO.Path.GetFileName(headerFile);
+            context.CopyFile(headerFile, $"{combinedSimulatorFramework}/Headers/{fileName}");
+        }
+        
+        // Create Info.plist for the combined simulator framework
+        CreateFrameworkInfoPlist(context, combinedSimulatorFramework, frameworkName, true);
+        
+        AnsiConsole.MarkupLine($"[green]Successfully created combined simulator framework at: {combinedSimulatorFramework}[/]");
+        return combinedSimulatorFramework;
+    }
+
     void CreateiOSXCFramework(BuildContext context)
     {
         var frameworkName = "OpenAL";
@@ -124,22 +185,29 @@ public sealed class BuildMacOSTask : FrostingTask<BuildContext>
             Directory.Delete(xcframeworkPath, true);
         }
         
-        // Collect all framework paths from individual architecture builds
-        var frameworkPaths = new List<string>();
-        var architectures = new[] { "ios-arm64", "iossimulator-x64", "iossimulator-arm64" };
+        // Create combined simulator framework by merging x86_64 and arm64 simulator binaries using lipo
+        var combinedSimulatorFrameworkPath = CreateCombinedSimulatorFramework(context, frameworkName);
         
-        foreach (var arch in architectures)
+        // Collect framework paths - device and combined simulator
+        var frameworkPaths = new List<string>();
+        
+        // Add device framework
+        var deviceFrameworkDir = $"{context.ArtifactsDir}/ios-arm64/{frameworkName}.framework";
+        if (Directory.Exists(deviceFrameworkDir) && File.Exists($"{deviceFrameworkDir}/{frameworkName}"))
         {
-            var archFrameworkDir = $"{context.ArtifactsDir}/{arch}/{frameworkName}.framework";
-            if (Directory.Exists(archFrameworkDir) && File.Exists($"{archFrameworkDir}/{frameworkName}"))
-            {
-                frameworkPaths.Add(archFrameworkDir);
-                AnsiConsole.MarkupLine($"[green]Found framework for {arch} at {archFrameworkDir}[/]");
-            }
-            else
-            {
-                AnsiConsole.MarkupLine($"[yellow]Framework not found for {arch} at {archFrameworkDir}[/]");
-            }
+            frameworkPaths.Add(deviceFrameworkDir);
+            AnsiConsole.MarkupLine($"[green]Found device framework at {deviceFrameworkDir}[/]");
+        }
+        else
+        {
+            AnsiConsole.MarkupLine($"[yellow]Device framework not found at {deviceFrameworkDir}[/]");
+        }
+        
+        // Add combined simulator framework
+        if (!string.IsNullOrEmpty(combinedSimulatorFrameworkPath))
+        {
+            frameworkPaths.Add(combinedSimulatorFrameworkPath);
+            AnsiConsole.MarkupLine($"[green]Found combined simulator framework at {combinedSimulatorFrameworkPath}[/]");
         }
         
         if (frameworkPaths.Count > 0)
