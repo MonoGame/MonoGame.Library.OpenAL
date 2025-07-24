@@ -21,10 +21,31 @@ public sealed class BuildMacOSTask : FrostingTask<BuildContext>
         context.StartProcess("cmake", new ProcessSettings { WorkingDirectory = buildWorkingDir, Arguments = "--build . --config Release" });
         var files = Directory.GetFiles(System.IO.Path.Combine(buildWorkingDir), "libopenal.*.*.*.dylib", SearchOption.TopDirectoryOnly);
         context.CopyFile(files[0], $"{context.ArtifactsDir}/osx/libopenal.dylib");
-        // Don't build iphone binary as we cannot use dylibs. 
-        //BuildiOS(context, "arm64", "ios-arm64", releaseDir: "Release-iphoneos");
+
+        // Build iOS device static library (.a)
+        BuildiOSDevice(context, "arm64", "ios-arm64", "Release-iphoneos");
+        // Build iOS simulator dylibs
         BuildiOS(context, "x86_64", "iossimulator-x64", true, "Release-iphonesimulator");
         BuildiOS(context, "arm64", "iossimulator-arm64", true, "Release-iphonesimulator");
+    }
+    // Build static .a for iOS device (arm64)
+    void BuildiOSDevice(BuildContext context, string arch, string rid, string releaseDir = "")
+    {
+        var buildWorkingDir = $"openal-soft/build_{rid}";
+        context.CreateDirectory(buildWorkingDir);
+        context.CreateDirectory($"{context.ArtifactsDir}/{rid}/");
+        context.StartProcess("cmake", new ProcessSettings {
+            WorkingDirectory = buildWorkingDir,
+            Arguments = $"-GXcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_ARCHITECTURES=\"{arch}\" -DALSOFT_REQUIRE_COREAUDIO=ON -DALSOFT_TESTS=OFF -DALSOFT_UTILS=OFF -DALSOFT_EXAMPLES=OFF -DALSOFT_INSTALL=OFF -DCMAKE_BUILD_TYPE=Release .."
+        });
+        context.StartProcess("cmake", new ProcessSettings {
+            WorkingDirectory = buildWorkingDir,
+            Arguments = $"--build . --config Release --target openal"
+        });
+        // Find the static libopenal.a
+        var files = Directory.GetFiles(System.IO.Path.Combine(buildWorkingDir, releaseDir), "libopenal.a", SearchOption.TopDirectoryOnly);
+        if (files.Length > 0)
+            context.CopyFile(files[0], $"{context.ArtifactsDir}/{rid}/libopenal.a");
     }
 
     void BuildiOS (BuildContext context, string arch, string rid, bool simulator = false, string releaseDir = "")
