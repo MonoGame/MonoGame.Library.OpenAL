@@ -67,11 +67,14 @@ public sealed class BuildMacOSTask : FrostingTask<BuildContext>
         }
         
         // Create Info.plist for the framework
-        CreateFrameworkInfoPlist(context, frameworkDir, frameworkName, arch);
+        CreateFrameworkInfoPlist(context, frameworkDir, frameworkName, simulator);
     }
 
-    void CreateFrameworkInfoPlist(BuildContext context, string frameworkDir, string frameworkName, string arch)
+    void CreateFrameworkInfoPlist(BuildContext context, string frameworkDir, string frameworkName, bool isSimulator)
     {
+        // Determine the correct supported platforms based on whether this is a simulator build
+        var supportedPlatforms = isSimulator ? "        <string>iPhoneSimulator</string>" : "        <string>iPhoneOS</string>";
+        
         var infoPlistContent = $@"<?xml version=""1.0"" encoding=""UTF-8""?>
 <!DOCTYPE plist PUBLIC ""-//Apple//DTD PLIST 1.0//EN"" ""http://www.apple.com/DTDs/PropertyList-1.0.dtd"">
 <plist version=""1.0"">
@@ -81,7 +84,7 @@ public sealed class BuildMacOSTask : FrostingTask<BuildContext>
     <key>CFBundleExecutable</key>
     <string>{frameworkName}</string>
     <key>CFBundleIdentifier</key>
-    <string>org.monogame.{frameworkName.ToLower()}</string>
+    <string>net.monogame.{frameworkName.ToLower()}</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
@@ -96,8 +99,7 @@ public sealed class BuildMacOSTask : FrostingTask<BuildContext>
     <string>1</string>
     <key>CFBundleSupportedPlatforms</key>
     <array>
-        <string>iPhoneOS</string>
-        <string>iPhoneSimulator</string>
+{supportedPlatforms}
     </array>
     <key>MinimumOSVersion</key>
     <string>9.0</string>
