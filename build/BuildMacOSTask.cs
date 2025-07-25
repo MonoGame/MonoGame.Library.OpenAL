@@ -35,8 +35,10 @@ public sealed class BuildMacOSTask : FrostingTask<BuildContext>
     void BuildiOS (BuildContext context, string arch, string rid, bool simulator = false, string releaseDir = "")
     {
         var buildWorkingDir = $"openal-soft/build_{rid}";
+        var tempArtifactsDir = $"artifacts";
         context.CreateDirectory(buildWorkingDir);
-        context.CreateDirectory($"{context.ArtifactsDir}/{rid}/");
+        context.CreateDirectory(tempArtifactsDir);
+        context.CreateDirectory($"{tempArtifactsDir}/{rid}/");
         var sdk = "";
         if (simulator) {
             IEnumerable<string> output;
@@ -50,7 +52,7 @@ public sealed class BuildMacOSTask : FrostingTask<BuildContext>
         
         // Create iOS Framework structure
         var frameworkName = "OpenAL";
-        var frameworkDir = $"{context.ArtifactsDir}/{rid}/{frameworkName}.framework";
+        var frameworkDir = $"{tempArtifactsDir}/{rid}/{frameworkName}.framework";
         context.CreateDirectory(frameworkDir);
         context.CreateDirectory($"{frameworkDir}/Headers");
         
@@ -115,10 +117,11 @@ public sealed class BuildMacOSTask : FrostingTask<BuildContext>
 
     string? CreateCombinedSimulatorFramework(BuildContext context, string frameworkName)
     {
-        var x64SimulatorFramework = $"{context.ArtifactsDir}/iossimulator-x64/{frameworkName}.framework";
-        var arm64SimulatorFramework = $"{context.ArtifactsDir}/iossimulator-arm64/{frameworkName}.framework";
-        var combinedSimulatorFramework = $"{context.ArtifactsDir}/iossimulator/{frameworkName}.framework";
-        
+        var tempArtifactsDir = $"artifacts";
+        var x64SimulatorFramework = $"{tempArtifactsDir}/iossimulator-x64/{frameworkName}.framework";
+        var arm64SimulatorFramework = $"{tempArtifactsDir}/iossimulator-arm64/{frameworkName}.framework";
+        var combinedSimulatorFramework = $"{tempArtifactsDir}/iossimulator/{frameworkName}.framework";
+
         // Check if both simulator frameworks exist
         if (!Directory.Exists(x64SimulatorFramework) || !File.Exists($"{x64SimulatorFramework}/{frameworkName}"))
         {
@@ -133,7 +136,7 @@ public sealed class BuildMacOSTask : FrostingTask<BuildContext>
         }
         
         // Create combined simulator framework directory
-        context.CreateDirectory($"{context.ArtifactsDir}/iossimulator/");
+        context.CreateDirectory($"{tempArtifactsDir}/iossimulator/");
         
         if (Directory.Exists(combinedSimulatorFramework))
         {
