@@ -179,6 +179,7 @@ public sealed class BuildMacOSTask : FrostingTask<BuildContext>
 
     void CreateiOSXCFramework(BuildContext context)
     {
+        var tempArtifactsDir = $"temp_artifacts";
         var frameworkName = "OpenAL";
         var xcframeworkPath = $"{context.ArtifactsDir}/ios/{frameworkName}.xcframework";
         
@@ -195,7 +196,7 @@ public sealed class BuildMacOSTask : FrostingTask<BuildContext>
         var frameworkPaths = new List<string>();
         
         // Add device framework
-        var deviceFrameworkDir = $"{context.ArtifactsDir}/ios-arm64/{frameworkName}.framework";
+        var deviceFrameworkDir = $"{tempArtifactsDir}/ios-arm64/{frameworkName}.framework";
         if (Directory.Exists(deviceFrameworkDir) && File.Exists($"{deviceFrameworkDir}/{frameworkName}"))
         {
             frameworkPaths.Add(deviceFrameworkDir);
