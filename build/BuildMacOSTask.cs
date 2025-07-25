@@ -35,7 +35,7 @@ public sealed class BuildMacOSTask : FrostingTask<BuildContext>
     void BuildiOS (BuildContext context, string arch, string rid, bool simulator = false, string releaseDir = "")
     {
         var buildWorkingDir = $"openal-soft/build_{rid}";
-        var tempArtifactsDir = $"artifacts";
+        var tempArtifactsDir = $"temp_artifacts";
         context.CreateDirectory(buildWorkingDir);
         context.CreateDirectory(tempArtifactsDir);
         context.CreateDirectory($"{tempArtifactsDir}/{rid}/");
@@ -117,7 +117,7 @@ public sealed class BuildMacOSTask : FrostingTask<BuildContext>
 
     string? CreateCombinedSimulatorFramework(BuildContext context, string frameworkName)
     {
-        var tempArtifactsDir = $"artifacts";
+        var tempArtifactsDir = $"temp_artifacts";
         var x64SimulatorFramework = $"{tempArtifactsDir}/iossimulator-x64/{frameworkName}.framework";
         var arm64SimulatorFramework = $"{tempArtifactsDir}/iossimulator-arm64/{frameworkName}.framework";
         var combinedSimulatorFramework = $"{tempArtifactsDir}/iossimulator/{frameworkName}.framework";
