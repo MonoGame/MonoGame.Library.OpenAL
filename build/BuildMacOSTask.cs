@@ -72,6 +72,20 @@ public sealed class BuildMacOSTask : FrostingTask<BuildContext>
             context.CopyFile(headerFile, $"{frameworkDir}/Headers/{fileName}");
         }
         
+        // Copy LICENSE file (rename LICENSE-pffft to LICENSE)
+        var licenseSourcePath = "openal-soft/LICENSE-pffft";
+        if (File.Exists(licenseSourcePath))
+        {
+            context.CopyFile(licenseSourcePath, $"{frameworkDir}/LICENSE");
+        }
+        
+        // Copy README file
+        var readmeSourcePath = "openal-soft/README.md";
+        if (File.Exists(readmeSourcePath))
+        {
+            context.CopyFile(readmeSourcePath, $"{frameworkDir}/README");
+        }
+        
         // Create Info.plist for the framework
         CreateFrameworkInfoPlist(context, frameworkDir, frameworkName, simulator);
     }
@@ -168,6 +182,19 @@ public sealed class BuildMacOSTask : FrostingTask<BuildContext>
         {
             var fileName = System.IO.Path.GetFileName(headerFile);
             context.CopyFile(headerFile, $"{combinedSimulatorFramework}/Headers/{fileName}");
+        }
+        
+        // Copy LICENSE and README files from the x64 simulator framework (they should be identical across frameworks)
+        var licenseSourcePath = $"{x64SimulatorFramework}/LICENSE";
+        if (File.Exists(licenseSourcePath))
+        {
+            context.CopyFile(licenseSourcePath, $"{combinedSimulatorFramework}/LICENSE");
+        }
+        
+        var readmeSourcePath = $"{x64SimulatorFramework}/README";
+        if (File.Exists(readmeSourcePath))
+        {
+            context.CopyFile(readmeSourcePath, $"{combinedSimulatorFramework}/README");
         }
         
         // Create Info.plist for the combined simulator framework
