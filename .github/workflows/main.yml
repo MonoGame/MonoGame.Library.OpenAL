@@ -49,6 +49,7 @@ jobs:
       packages: write
       contents: write
     needs: [ build ]
+    if: ${{ github.event_name == 'push' }}
     steps:
       - name: Expose GitHub Runtime
         uses: crazy-max/ghaction-github-runtime@v3
@@ -73,3 +74,4 @@ jobs:
           removeArtifacts: true
           artifacts: "bin/Release/*.nupkg"
           token: ${{ secrets.GITHUB_TOKEN }}
+        if: github.ref_type == 'tag'
