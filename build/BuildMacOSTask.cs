@@ -1,6 +1,8 @@
 using System.Runtime.InteropServices;
 using System.Collections.Generic;
 using System;
+using System.IO;
+using System.Linq;
 using Spectre.Console;
 
 namespace BuildScripts;
@@ -21,8 +23,8 @@ public sealed class BuildMacOSTask : FrostingTask<BuildContext>
         context.StartProcess("cmake", new ProcessSettings { WorkingDirectory = buildWorkingDir, Arguments = "--build . --config Release" });
         var files = Directory.GetFiles(System.IO.Path.Combine(buildWorkingDir), "libopenal.*.*.*.dylib", SearchOption.TopDirectoryOnly);
         context.CopyFile(files[0], $"{context.ArtifactsDir}/osx/libopenal.dylib");
-        // Don't build iphone binary as we cannot use dylibs. 
-        //BuildiOS(context, "arm64", "ios-arm64", releaseDir: "Release-iphoneos");
+        // Build iOS device and simulator static libraries
+        BuildiOS(context, "arm64", "ios-arm64", false, "Release-iphoneos");
         BuildiOS(context, "x86_64", "iossimulator-x64", true, "Release-iphonesimulator");
         BuildiOS(context, "arm64", "iossimulator-arm64", true, "Release-iphonesimulator");
     }
@@ -39,11 +41,16 @@ public sealed class BuildMacOSTask : FrostingTask<BuildContext>
             //This does not work when used as an argument? $(xcodebuild -version -sdk iphonesimulator Path)";
             sdk = $" -DCMAKE_OSX_SYSROOT={output.First()}";
         }
-        context.StartProcess("cmake", new ProcessSettings { WorkingDirectory = buildWorkingDir, Arguments = $"-GXcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_ARCHITECTURES=\"{arch}\" -DALSOFT_REQUIRE_COREAUDIO=ON -DALSOFT_TESTS=OFF -DALSOFT_UTILS=OFF -DALSOFT_EXAMPLES=OFF -DALSOFT_INSTALL=OFF -DCMAKE_BUILD_TYPE=Release{sdk} .." });
+        // Build static library for iOS
+        context.StartProcess("cmake", new ProcessSettings { WorkingDirectory = buildWorkingDir, Arguments = $"-GXcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_ARCHITECTURES=\"{arch}\" -DALSOFT_REQUIRE_COREAUDIO=ON -DALSOFT_TESTS=OFF -DALSOFT_UTILS=OFF -DALSOFT_EXAMPLES=OFF -DALSOFT_INSTALL=OFF -DCMAKE_BUILD_TYPE=Release -DLIBTYPE=STATIC{sdk} .." });
         context.StartProcess("cmake", new ProcessSettings { WorkingDirectory = buildWorkingDir, Arguments = $"--build . --config Release" });
-        var files = Directory.GetFiles(System.IO.Path.Combine(buildWorkingDir, releaseDir), "libopenal.*.*.*.dylib", SearchOption.TopDirectoryOnly);
-        //if (files.Length > 0)
-        context.CopyFile(files[0], $"{context.ArtifactsDir}/{rid}/libopenal.dylib");
+        
+        // Find and copy the static library to artifacts
+        var staticLibFiles = Directory.GetFiles(System.IO.Path.Combine(buildWorkingDir, releaseDir), "libopenal.a", SearchOption.TopDirectoryOnly);
+        if (staticLibFiles.Length > 0)
+        {
+            context.CopyFile(staticLibFiles[0], $"{context.ArtifactsDir}/{rid}/libopenal.a");
+        }
     }
 
     void BuildAndroid (BuildContext context, string arch, string rid, string minNdk)
