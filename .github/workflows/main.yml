@@ -27,7 +27,7 @@ jobs:
         uses: microsoft/setup-msbuild@v1.0.2
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
-        run: sudo apt-get install build-essential git make cmake autoconf automake pkg-config
+        run: sudo apt-get update &&sudo apt-get install build-essential git make cmake autoconf automake pkg-config
         shell: bash
       - name: Install Linux OpenAL dependencies
         if: runner.os == 'Linux'
