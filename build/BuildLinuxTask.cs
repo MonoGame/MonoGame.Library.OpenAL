@@ -16,9 +16,9 @@ public sealed class BuildLinuxTask : FrostingTask<BuildContext>
         var arch = architecture == Architecture.Arm64 ? "arm64" : "x64";
         context.CreateDirectory(buildWorkingDir);
         context.CreateDirectory($"{context.ArtifactsDir}/linux-{arch}/");
-        context.StartProcess("cmake", new ProcessSettings { WorkingDirectory = buildWorkingDir, Arguments = "-DALSOFT_TESTS=OFF -DALSOFT_UTILS=OFF -DALSOFT_EXAMPLES=OFF -DALSOFT_INSTALL=OFF -DALSOFT_BACKEND_SNDIO=OFF -DCMAKE_BUILD_TYPE=Release .." });
-        context.StartProcess("make", new ProcessSettings { WorkingDirectory = buildWorkingDir, Arguments = "" });
-        context.StartProcess ("strip", new ProcessSettings { WorkingDirectory = buildWorkingDir, Arguments = $"--strip-all libopenal.so"});
+        context.StartProcessWithDocker("cmake", new ProcessSettings { WorkingDirectory = buildWorkingDir, Arguments = "-DALSOFT_TESTS=OFF -DALSOFT_UTILS=OFF -DALSOFT_EXAMPLES=OFF -DALSOFT_INSTALL=OFF -DALSOFT_BACKEND_SNDIO=OFF -DCMAKE_BUILD_TYPE=Release .." });
+        context.StartProcessWithDocker("make", new ProcessSettings { WorkingDirectory = buildWorkingDir, Arguments = "" });
+        context.StartProcessWithDocker("strip", new ProcessSettings { WorkingDirectory = buildWorkingDir, Arguments = $"--strip-all libopenal.so"});
         context.CopyFile($"{buildWorkingDir}/libopenal.so", $"{context.ArtifactsDir}/linux-{arch}/libopenal.so");
         BuildAndroid (context, "arm64-v8a", "android-arm64", "23");
         BuildAndroid (context, "armeabi-v7a", "android-arm", "23");
