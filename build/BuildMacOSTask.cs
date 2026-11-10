@@ -27,6 +27,10 @@ public sealed class BuildMacOSTask : FrostingTask<BuildContext>
         BuildiOS(context, "arm64", "ios-arm64", false, "Release-iphoneos");
         BuildiOS(context, "x86_64", "iossimulator-x64", true, "Release-iphonesimulator");
         BuildiOS(context, "arm64", "iossimulator-arm64", true, "Release-iphonesimulator");
+        // Build tvOS device and simultor static libraries
+        BuildTVOS(context, "arm64", "tvos-arm64", false, "Release-appletvos");
+        BuildTVOS(context, "x86_64", "tvossimulator-x64", true, "Release-appletvsimulator");
+        BuildTVOS(context, "arm64", "tvossimulator-arm64", true, "Release-appletvsimulator");
     }
 
     void BuildiOS (BuildContext context, string arch, string rid, bool simulator = false, string releaseDir = "")
@@ -43,6 +47,28 @@ public sealed class BuildMacOSTask : FrostingTask<BuildContext>
         }
         // Build static library for iOS
         context.StartProcess("cmake", new ProcessSettings { WorkingDirectory = buildWorkingDir, Arguments = $"-GXcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_ARCHITECTURES=\"{arch}\" -DALSOFT_REQUIRE_COREAUDIO=ON -DALSOFT_TESTS=OFF -DALSOFT_UTILS=OFF -DALSOFT_EXAMPLES=OFF -DALSOFT_INSTALL=OFF -DCMAKE_BUILD_TYPE=Release -DLIBTYPE=STATIC{sdk} .." });
+        context.StartProcess("cmake", new ProcessSettings { WorkingDirectory = buildWorkingDir, Arguments = $"--build . --config Release" });
+        
+        // Find and copy the static library to artifacts
+        var staticLibFiles = Directory.GetFiles(System.IO.Path.Combine(buildWorkingDir, releaseDir), "libopenal.a", SearchOption.TopDirectoryOnly);
+        if (staticLibFiles.Length > 0)
+        {
+            context.CopyFile(staticLibFiles[0], $"{context.ArtifactsDir}/{rid}/libopenal.a");
+        }
+    }
+
+    void BuildTVOS (BuildContext context, string arch, string rid, bool simulator = false, string releaseDir = "")
+    {
+        var buildWorkingDir = $"openal-soft/build_{rid}";
+        context.CreateDirectory(buildWorkingDir);
+        context.CreateDirectory($"{context.ArtifactsDir}/{rid}/");
+        var sdkName = simulator ? "appletvsimulator" : "appletvos";
+        IEnumerable<string> output;
+        context.StartProcess("xcodebuild", new ProcessSettings { WorkingDirectory = buildWorkingDir, RedirectStandardOutput = true, Arguments=$"-version -sdk {sdkName} Path"}, out output);
+        //This does not work when used as an argument? $(xcodebuild -version -sdk iphonesimulator Path)";
+        var sdk = $" -DCMAKE_OSX_SYSROOT={output.First().Trim()}";
+        // Build static library for iOS
+        context.StartProcess("cmake", new ProcessSettings { WorkingDirectory = buildWorkingDir, Arguments = $"-GXcode -DCMAKE_SYSTEM_NAME=tvOS -DCMAKE_OSX_ARCHITECTURES=\"{arch}\" -DALSOFT_REQUIRE_COREAUDIO=ON -DALSOFT_TESTS=OFF -DALSOFT_UTILS=OFF -DALSOFT_EXAMPLES=OFF -DALSOFT_INSTALL=OFF -DCMAKE_BUILD_TYPE=Release -DLIBTYPE=STATIC{sdk} .." });
         context.StartProcess("cmake", new ProcessSettings { WorkingDirectory = buildWorkingDir, Arguments = $"--build . --config Release" });
         
         // Find and copy the static library to artifacts
